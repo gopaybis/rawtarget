@@ -1,18 +1,18 @@
-// File: worker.js
-export default async function (request) {
+export default async function (req) {
   const now = new Date().toISOString();
-  const ip = request.headers.get("x-forwarded-for") || "unknown";
+  const ip = req.headers.get("x-forwarded-for") || "unknown";
+  const ua = req.headers.get("user-agent") || "unknown";
 
   return new Response(
     JSON.stringify({
-      message: "Halo dari worker.js remote!",
-      ip: ip,
+      message: "🎉 Halo dari iworker.js yang valid!",
+      ip,
+      userAgent: ua,
       time: now,
-      headers: Object.fromEntries(request.headers.entries())
     }),
     {
       headers: { "Content-Type": "application/json" },
-      status: 200
+      status: 200,
     }
   );
 }

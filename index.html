@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Proxy Checker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #eee;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .controls {
+      margin-bottom: 1rem;
+    }
+    .controls select, .controls button {
+      margin-right: 8px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: none;
+      background: #333;
+      color: white;
+    }
+    .proxy-card {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status-badge {
+      padding: 0.3rem 0.6rem;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    .status-loading { background-color: #444; color: #fff; }
+    .status-ok { background-color: #4caf50; color: #fff; }
+    .status-dead { background-color: #f44336; color: #fff; }
+    .pagination {
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .pagination button {
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      margin: 0 0.2rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .pagination button.active {
+      background: #2196f3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Proxy Checker</h1>
+
+    <div class="controls">
+      <select id="country-filter">
+        <option value="">🌍 Semua Negara</option>
+      </select>
+      <button onclick="copyActive()">📋 Salin Aktif</button>
+      <button onclick="downloadActive()">⬇️ Unduh Aktif</button>
+      <button onclick="rotateActive()">🔁 Proxy Acak</button>
+    </div>
+
+    <div id="proxy-list"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <script>
+    const TXT_URL = 'https://raw.githubusercontent.com/gopaybis/Proxylist/refs/heads/main/proxyiplengkap5.txt';
+    const API_CHECK = 'https://apihealtcheck.vercel.app/api/v1?ip=';
+    let allProxies = [];
+    let filteredProxies = [];
+    let currentPage = 1;
+    const perPage = 10;
+    const activeProxies = [];
+
+    async function loadProxyList() {
+      const res = await fetch(TXT_URL);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+
+      allProxies = lines.map(line => {
+        const [ip, port, cc, org] = line.split(',');
+        return { ip, port, cc, org };
+      });
+
+      populateCountryFilter();
+      filterByCountry();
+    }
+
+    function populateCountryFilter() {
+      const select = document.getElementById('country-filter');
+      const unique = [...new Set(allProxies.map(p => p.cc))].sort();
+      unique.forEach(cc => {
+        const opt = document.createElement('option');
+        opt.value = cc;
+        opt.textContent = cc;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', filterByCountry);
+    }
+
+    function filterByCountry() {
+      const cc = document.getElementById('country-filter').value;
+      filteredProxies = cc ? allProxies.filter(p => p.cc === cc) : [...allProxies];
+      activeProxies.length = 0;
+      renderPage(1);
+    }
+
+    function renderPage(page) {
+      currentPage = page;
+      const start = (page - 1) * perPage;
+      const paginated = filteredProxies.slice(start, start + perPage);
+
+      document.getElementById('proxy-list').innerHTML = '';
+      paginated.forEach(proxy => renderCard(proxy));
+      renderPagination();
+    }
+
+    function renderCard(proxy) {
+      const card = document.createElement('div');
+      card.className = 'proxy-card';
+
+      const left = document.createElement('div');
+      left.innerHTML = `<strong>${proxy.cc}</strong> - ${proxy.ip}:${proxy.port}<br><small>${proxy.org}</small>`;
+
+      const status = document.createElement('div');
+      status.className = 'status-badge status-loading';
+      status.textContent = 'Checking...';
+
+      card.appendChild(left);
+      card.appendChild(status);
+      document.getElementById('proxy-list').appendChild(card);
+
+      checkProxyStatus(proxy, status);
+    }
+
+    async function checkProxyStatus(proxy, badge) {
+      try {
+        const res = await fetch(`${API_CHECK}${proxy.ip}&port=${proxy.port}`);
+        const data = await res.json();
+        if (data?.status === 'ok') {
+          badge.className = 'status-badge status-ok';
+          badge.textContent = 'Active';
+          activeProxies.push(`${proxy.ip}:${proxy.port}`);
+        } else {
+          badge.className = 'status-badge status-dead';
+          badge.textContent = 'Dead';
+        }
+      } catch {
+        badge.className = 'status-badge status-dead';
+        badge.textContent = 'Dead';
+      }
+    }
+
+    function renderPagination() {
+      const totalPages = Math.ceil(filteredProxies.length / perPage);
+      const container = document.getElementById('pagination');
+      container.innerHTML = '';
+
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        if (i === currentPage) btn.classList.add('active');
+        btn.addEventListener('click', () => renderPage(i));
+        container.appendChild(btn);
+      }
+    }
+
+    function copyActive() {
+      if (activeProxies.length === 0) return alert("Belum ada proxy aktif.");
+      navigator.clipboard.writeText(activeProxies.join('\n'));
+      alert("✅ Disalin ke clipboard!");
+    }
+
+    function downloadActive() {
+      if (activeProxies.length === 0) return alert("Tidak ada proxy aktif.");
+      const blob = new Blob([activeProxies.join('\n')], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'proxy-aktif.txt';
+      link.click();
+    }
+
+    function rotateActive() {
+      if (activeProxies.length === 0) return alert("Tidak ada proxy aktif.");
+      const random = activeProxies[Math.floor(Math.random() * activeProxies.length)];
+      alert("🔁 Proxy Acak:\n" + random);
+    }
+
+    loadProxyList();
+  </script>
+</body>
+</html>

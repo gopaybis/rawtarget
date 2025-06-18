@@ -1,6 +1,3 @@
-async function handler(req) {
-  return new Response("✅ Worker sukses dijalankan dari remote!", {
-    status: 200,
-    headers: { "Content-Type": "text/plain" }
-  });
-}
+module.exports = async function (req, res) {
+  res.end("✅ Remote worker.js berhasil dijalankan!");
+};
